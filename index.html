@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Metronome — Tap • Train • Subdivide</title>
+<style>
+  :root{
+    --bg:#0f1222; --panel:#151935; --muted:#8b93b7; --text:#eaf0ff; --acc:#6dd3ff; --acc2:#a8ff9e; --danger:#ff6d91;
+    --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 
+               "Apple Color Emoji","Segoe UI Emoji"; color:var(--text); background: radial-gradient(1200px 600px at 70% -200px, #1b2050 0%, var(--bg) 60%);
+  }
+  .grid{display:grid; gap:14px}
+  .wrap{max-width:1100px; margin:0 auto; padding:20px}
+  .header{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px}
+  h1{font-size:20px; margin:0; letter-spacing:.4px; opacity:.9}
+  .panel{background: var(--panel); border-radius:18px; box-shadow:var(--shadow); padding:18px}
+  .row{display:flex; gap:16px; flex-wrap:wrap}
+  .col{flex:1 1 280px; min-width:260px}
+  .label{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  .value{font-weight:700}
+  .btn{border:0; background:#1e2552; color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer;}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  .btn.primary{background:linear-gradient(135deg, #2f6bff, #6dd3ff)}
+  .btn.soft{background:#20265b}
+  .btn.tiny{padding:6px 10px; font-size:12px}
+  .btn.toggle{background:#20265b}
+  .btn.toggle.active{outline:2px solid var(--acc)}
+  .knob-wrap{display:flex; align-items:center; justify-content:center; position:relative}
+  .knob{
+    width:220px; height:220px; border-radius:50%; background: conic-gradient(from 180deg, #20264f, #1b2147);
+    display:grid; place-items:center; box-shadow: inset 0 8px 18px rgba(255,255,255,.04), inset 0 -8px 30px rgba(0,0,0,.4), var(--shadow);
+    user-select:none; touch-action:none; position:relative;
+  }
+  .knob::after{content:""; position:absolute; inset:14px; border-radius:50%; background: radial-gradient(600px 400px at 20% 10%, #26306a, #151a3e)}
+  .knob .needle{
+    position:absolute; width:4px; height:38%; background:linear-gradient(#8fd4ff,#eaf8ff); top:12%; left:calc(50% - 2px); border-radius:2px; transform-origin:50% 86%;
+    filter: drop-shadow(0 0 6px rgba(141,227,255,.4));
+  }
+  .knob .center{width:56px; height:56px; border-radius:50%; background:radial-gradient(#1b2147,#121632); position:relative; z-index:2; 
+    display:grid; place-items:center; font-weight:800}
+  .bpm{font-size:38px; letter-spacing:1px}
+  .subrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .seg{background:#0f1330; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:8px}
+  .seg .num{min-width:28px; text-align:center; font-weight:700}
+  .seg .pm{display:flex; gap:6px}
+  .seg .pm button{width:28px; height:28px; border-radius:8px}
+  .time-box{display:grid; place-items:center; background:#0f1330; border-radius:14px; padding:14px}
+  .time{font-weight:800; font-size:28px}
+  .note-card{display:flex; align-items:center; gap:10px; background:#0f1330; border-radius:14px; padding:12px 14px}
+  .note-svg{width:36px; height:36px}
+  .tiny-muted{font-size:12px; color:var(--muted)}
+  .pendulum{height:18px; border-radius:12px; background:#11163a; position:relative; overflow:hidden}
+  .dot{position:absolute; top:2px; width:14px; height:14px; border-radius:50%; background:var(--acc2); box-shadow: 0 0 16px rgba(168,255,158,.7)}
+  .kit-select{min-width:180px}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .beats-grid{display:grid; grid-auto-flow:column; gap:8px; align-items:end; padding:10px; background:#0f1330; border-radius:12px; overflow:auto}
+  .beat-col{width:28px; display:grid; grid-template-rows:repeat(3, 14px); gap:4px; cursor:pointer}
+  .cell{border-radius:3px; background:#2a2f5f}
+  .filled1{background:#7fb1ff}
+  .filled2{background:#79e0ff}
+  .filled3{background:#a8ff9e}
+  .muted{opacity:.5; filter:saturate(.6)}
+  .range{width:100%}
+  .footer{opacity:.7; font-size:12px; margin-top:10px}
+  .row.wrap-sm{gap:8px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Metronome</h1>
+      <div class="subrow">
+        <button id="startBtn" class="btn primary">Start</button>
+        <button id="stopBtn" class="btn soft" disabled>Stop</button>
+        <button id="tapBtn" class="btn soft">Tap</button>
+        <button id="visualToggle" class="btn toggle">Visual On</button>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 320px 1fr;">
+      <!-- Left controls -->
+      <div class="panel col">
+        <div class="label">Beat (beats per bar)</div>
+        <div class="subrow" style="margin-top:6px;">
+          <div class="seg">
+            <div class="pm">
+              <button id="beatMinus" class="btn tiny">−</button>
+              <button id="beatPlus" class="btn tiny">+</button>
+            </div>
+            <div class="num" id="beatsPerBar">4</div>
+          </div>
+          <div style="flex:1"></div>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="label">Subdivision (note value)</div>
+        <div class="note-card" style="margin-top:6px;">
+          <svg class="note-svg" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M20 46c0 5 4 9 9 9s9-4 9-9V14h6V8H32v28c-2-1-4-2-6-2-4 0-6 3-6 6z" fill="url(#g1)"/>
+            <defs><linearGradient id="g1" x1="0" x2="1"><stop stop-color="#7fb1ff"/><stop offset="1" stop-color="#6dd3ff"/></linearGradient></defs>
+          </svg>
+          <div>
+            <div class="label">Current</div>
+            <div class="value" id="noteLabel">Crotchet (4)</div>
+            <div class="tiny-muted">Shorter = more clicks per beat</div>
+          </div>
+          <div style="flex:1"></div>
+          <div class="pm">
+            <button id="noteLonger" class="btn tiny">−</button>
+            <button id="noteShorter" class="btn tiny">+</button>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="time-box">
+          <div class="label" style="margin-bottom:4px;">Time Signature</div>
+          <div class="time"><span id="timeSigTop">4</span>/<span id="timeSigBottom">4</span></div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">Volume</div>
+        <input id="volume" class="range" type="range" min="0" max="1" step="0.01" value="0.8" />
+        <div class="footer">Audio keeps accurate time even if you switch tabs.</div>
+      </div>
+
+      <!-- Center: Knob + pendulum + per-beat accents -->
+      <div class="panel col" style="display:grid; grid-template-columns: 1fr; gap:14px;">
+        <div class="row">
+          <div class="knob-wrap" style="flex:1;">
+            <div class="knob" id="knob" aria-label="Tempo dial" role="slider" tabindex="0" aria-valuemin="20" aria-valuemax="300" aria-valuenow="120">
+              <div class="needle" id="needle"></div>
+              <div class="center">
+                <div class="bpm" id="bpmDisplay">120</div>
+                <div class="tiny-muted">BPM</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1; display:grid; gap:14px;">
+            <div>
+              <div class="label">Visual Pendulum</div>
+              <div class="pendulum" id="pendulum"><div class="dot" id="dot" style="left:2px"></div></div>
+            </div>
+
+            <div>
+              <div class="row wrap-sm" style="align-items:center">
+                <div class="label">Sound set</div>
+                <select id="kitSelect" class="btn kit-select">
+                  <option value="auto">Auto-detect /audio (woodblock1/2/3)</option>
+                  <option value="click">Synthetic Click</option>
+                  <option value="sine">Synthetic Sine</option>
+                  <option value="noise">Synthetic Noise</option>
+                </select>
+              </div>
+              <div class="tiny-muted">If the /audio files aren’t found, we auto-fallback to synthetic clicks.</div>
+            </div>
+
+            <div>
+              <div class="label">Per-Beat Accents (click columns to cycle)</div>
+              <div class="beats-grid" id="beatsGrid"></div>
+              <div class="tiny-muted">3 rows = strong (woodblock1), 2 = medium (woodblock2), 1 = light (woodblock3), 0 = mute.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Speed trainer -->
+        <div class="panel" style="background:#0f1330">
+          <div class="row" style="align-items:end">
+            <div class="col">
+              <div class="label">Speed Trainer</div>
+              <div class="two-col" style="margin-top:8px">
+                <div>
+                  <div class="tiny-muted">Start BPM</div>
+                  <input id="stStart" type="number" value="100" min="20" max="300" class="btn" />
+                </div>
+                <div>
+                  <div class="tiny-muted">End BPM</div>
+                  <input id="stEnd" type="number" value="140" min="20" max="300" class="btn" />
+                </div>
+                <div>
+                  <div class="tiny-muted">Step (+/−)</div>
+                  <input id="stStep" type="number" value="5" min="1" max="30" class="btn" />
+                </div>
+                <div>
+                  <div class="tiny-muted">Advance by</div>
+                  <select id="stMode" class="btn">
+                    <option value="time">Time</option>
+                    <option value="bars">Bars</option>
+                  </select>
+                </div>
+                <div>
+                  <div class="tiny-muted">Every (secs | bars)</div>
+                  <input id="stEvery" type="number" value="30" min="1" class="btn" />
+                </div>
+                <div>
+                  <div class="tiny-muted">Enable</div>
+                  <button id="stEnable" class="btn toggle">Off</button>
+                </div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="label">Tap Tempo</div>
+              <div class="subrow" style="margin-top:8px">
+                <div class="seg">
+                  <div class="tiny-muted" id="tapStatus">Tap 4 times</div>
+                </div>
+                <button id="tapClear" class="btn tiny soft">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="footer">Pro tip: press <kbd>↑</kbd>/<kbd>↓</kbd> to change BPM by 1, <kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> by 5. Tap the big dial to start/stop.</div>
+  </div>
+
+<script>
+(() => {
+  // =========================
+  // Utilities
+  // =========================
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+  const $ = sel => document.querySelector(sel);
+  const el = id => document.getElementById(id);
+  const wait = ms=>new Promise(r=>setTimeout(r,ms));
+
+  // Note value ladder for "subdivision" control.
+  // We map to denominator (1,2,4,8,16,32). Display names are common British terms.
+  const NOTE_STEPS = [
+    {den:1,  name:'Semibreve (1)'},
+    {den:2,  name:'Minim (2)'},
+    {den:4,  name:'Crotchet (4)'},
+    {den:8,  name:'Quaver (8)'},
+    {den:16, name:'Semiquaver (16)'},
+    {den:32, name:'Demisemiquaver (32)'},
+  ];
+  let noteIndex = 2; // default Crotchet (4)
+
+  // State
+  let bpm = 120;
+  let beatsPerBar = 4;     // numerator (1..16)
+  const maxBeats = 16;
+  const minBeats = 1;
+  const volumeNode = { gain: 0.8 };
+  let runVisual = true;
+
+  // Per-beat accent pattern: array of ints [0..3]
+  // Default: 4/4, first beat = 3 (strong), others = 1 (light)
+  let accents = Array.from({length:beatsPerBar}, (_,i)=> i===0 ? 3 : 1);
+
+  // Tap tempo
+  let tapTimes = [];
+  const TAP_RESET_MS = 1500;
+
+  // Speed trainer
+  let st = { enabled:false, start:100, end:140, step:5, mode:'time', every:30, _timer:null, _barsLeft:0 };
+
+  // =========================
+  // Audio Engine (Web Audio)
+  // =========================
+  const Audio = {
+    ctx: null,
+    outGain: null,
+    schedulerTimer: null,
+    lookahead: 0.025,      // 25ms
+    scheduleAhead: 0.10,   // seconds
+    nextNoteTime: 0,
+    subdivisionIndex: 0,   // which subdivision within bar
+    subPerBeat: 1,         // from note denominator vs crotchet
+    currentBeatInBar: 0,
+    barLengthSubs: 0,
+
+    // Buffers for samples (strong/med/light). If not present, synth fallback.
+    buffers: { strong:null, medium:null, light:null },
+    usingSamples: false,
+
+    async init(){
+      if(this.ctx) return;
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.outGain = this.ctx.createGain();
+      this.outGain.gain.value = volumeNode.gain;
+      this.outGain.connect(this.ctx.destination);
+      await this.loadKitAuto(); // try auto-detect; may fallback
+      this.updateSubdivision();
+    },
+
+    setVolume(v){
+      volumeNode.gain = v;
+      if(this.outGain) this.outGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    },
+
+    // Attempt to load /audio/woodblock1/2/3; fallback to synth if not found.
+    async loadKitAuto(){
+      const tryExts = ['.wav','.mp3','.ogg'];
+      async function fetchBuffer(ctx, base){
+        for (const ext of tryExts){
+          try {
+            const res = await fetch(`/audio/${base}${ext}`, {cache:'no-store'});
+            if(!res.ok) throw new Error('not found');
+            const ab = await res.arrayBuffer();
+            return await ctx.decodeAudioData(ab);
+          } catch(e){}
+        }
+        return null;
+      }
+      let s=null,m=null,l=null;
+      try {
+        s = await fetchBuffer(this.ctx, 'woodblock1');
+        m = await fetchBuffer(this.ctx, 'woodblock2');
+        l = await fetchBuffer(this.ctx, 'woodblock3');
+      } catch(e){}
+      if(s && m && l){
+        this.buffers = {strong:s, medium:m, light:l};
+        this.usingSamples = true;
+        el('kitSelect').value = 'auto';
+      } else {
+        this.buffers = {strong:null, medium:null, light:null};
+        this.usingSamples = false;
+        el('kitSelect').value = 'click';
+      }
+    },
+
+    setKit(mode){
+      if(mode === 'auto'){
+        // keep whatever we loaded; if none, we are on synth
+        this.usingSamples = !!(this.buffers.strong && this.buffers.medium && this.buffers.light);
+        return;
+      }
+      // Force synth by clearing buffers (but keep originals in closure if needed)
+      this.usingSamples = false;
+      this.synthMode = mode; // 'click' | 'sine' | 'noise'
+    },
+
+    // Calculate number of subdivisions per beat relative to crotchet BPM.
+    updateSubdivision(){
+      const den = NOTE_STEPS[noteIndex].den; // e.g., 8 for quaver
+      // If BPM is crotchet-based, then per crotchet we want (den/4) subdivisions.
+      this.subPerBeat = Math.max(1, Math.floor(den/4)); // 1, 2, 4, 8
+      // total subs per bar:
+      this.barLengthSubs = beatsPerBar * this.subPerBeat;
+    },
+
+    start(){
+      if(!this.ctx) return;
+      this.nextNoteTime = this.ctx.currentTime + 0.06; // little delay
+      this.subdivisionIndex = 0;
+      this.currentBeatInBar = 0;
+      this.scheduler(); // kick once; then interval drives it
+      if(this.schedulerTimer) clearInterval(this.schedulerTimer);
+      this.schedulerTimer = setInterval(()=>this.scheduler(), this.lookahead*1000);
+    },
+
+    stop(){
+      if(this.schedulerTimer){ clearInterval(this.schedulerTimer); this.schedulerTimer = null; }
+    },
+
+    scheduleClick(when, isBeat, strength /*0..3*/, isSubdiv=false){
+      if(strength<=0 && isBeat) return; // muted beat
+      const vol = isBeat ? (strength===3?1.0: strength===2?0.75:0.5) : 0.35;
+      const freq = isBeat ? (strength>=2? 1700: 1200) : 900;
+
+      if(this.usingSamples){
+        let buf = null;
+        if(isBeat){
+          buf = strength===3 ? this.buffers.strong
+              : strength===2 ? this.buffers.medium
+              : this.buffers.light;
+        } else {
+          // subdivision → use light sample quietly
+          buf = this.buffers.light;
+        }
+        if(buf){
+          const s = this.ctx.createBufferSource();
+          s.buffer = buf;
+          const g = this.ctx.createGain();
+          g.gain.value = vol * volumeNode.gain;
+          s.connect(g).connect(this.outGain);
+          s.start(when);
+        }
+      } else {
+        // Synth fallback
+        const o = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        const t = 0.015; // short tick
+        const mode = this.synthMode || 'click';
+        if(mode==='click'){
+          o.type = 'square';
+          o.frequency.setValueAtTime(freq, when);
+        } else if(mode==='sine'){
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, when);
+        } else if(mode==='noise'){
+          // noise burst
+          const bufferSize = 0.05 * this.ctx.sampleRate;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for(let i=0;i<buffer.length;i++){ data[i] = (Math.random()*2-1) * (isBeat?0.7:0.4); }
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+          g.gain.setValueAtTime(vol*volumeNode.gain, when);
+          g.gain.exponentialRampToValueAtTime(0.0001, when+0.04);
+          noise.connect(g).connect(this.outGain);
+          noise.start(when);
+          return;
+        }
+        g.gain.setValueAtTime(vol*volumeNode.gain, when);
+        g.gain.exponentialRampToValueAtTime(0.0001, when+t);
+        o.connect(g).connect(this.outGain);
+        o.start(when);
+        o.stop(when+t);
+      }
+    },
+
+    scheduler(){
+      const secPerBeat = 60.0 / bpm; // beat = crotchet
+      const secPerSubdivision = secPerBeat / this.subPerBeat;
+
+      while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAhead) {
+        const subInBeat = this.subdivisionIndex % this.subPerBeat;
+        const isBeat = (subInBeat === 0);
+        if(isBeat){
+          // Which beat in bar?
+          const beatIdx = (this.subdivisionIndex / this.subPerBeat) % beatsPerBar | 0;
+          const strength = accents[beatIdx] || 0;
+          this.scheduleClick(this.nextNoteTime, true, strength, false);
+          Visual.onBeat(beatIdx);
+          SpeedTrainer.onBeat();
+        } else {
+          // subdivision tick (light)
+          this.scheduleClick(this.nextNoteTime, false, 1, true);
+        }
+
+        this.nextNoteTime += secPerSubdivision;
+        this.subdivisionIndex = (this.subdivisionIndex + 1) % (this.barLengthSubs || 1);
+        if(this.subdivisionIndex===0){ this.currentBeatInBar = 0 } // new bar
+      }
+    },
+  };
+
+  // =========================
+  // Visuals
+  // =========================
+  const Visual = {
+    dot: el('dot'),
+    pendulum: el('pendulum'),
+    grid: el('beatsGrid'),
+    activeIndex: -1,
+    onBeat(beatIdx){
+      // Pendulum swing
+      if(runVisual){
+        const w = this.pendulum.clientWidth - 18;
+        const x = (beatIdx % 2 === 0) ? 2 : w;
+        this.dot.style.left = `${x}px`;
+      }
+      // Animate column highlight
+      const cols = this.grid.querySelectorAll('.beat-col');
+      cols.forEach((c,i)=>{
+        c.classList.toggle('muted', i!==beatIdx);
+      });
+      setTimeout(()=>{
+        cols.forEach(c=>c.classList.remove('muted'));
+      }, 90);
+    },
+    buildGrid(){
+      this.grid.innerHTML = '';
+      for(let i=0;i<beatsPerBar;i++){
+        const col = document.createElement('div');
+        col.className = 'beat-col';
+        col.dataset.index = i;
+        // 3 rows (from bottom visually)
+        for(let r=0;r<3;r++){
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          col.appendChild(cell);
+        }
+        this.grid.appendChild(col);
+        this.paintCol(i);
+        col.addEventListener('click', ()=>{
+          accents[i] = (accents[i] + 1) % 4; // 0..3
+          this.paintCol(i);
+        });
+      }
+    },
+    paintCol(i){
+      const col = this.grid.querySelector(`.beat-col[data-index="${i}"]`);
+      if(!col) return;
+      const a = accents[i] || 0;
+      const cells = Array.from(col.children);
+      // Clear
+      cells.forEach(c=>c.className='cell');
+      if(a>=1) cells[2].classList.add('filled1'); // bottom
+      if(a>=2) cells[1].classList.add('filled2');
+      if(a>=3) cells[0].classList.add('filled3');
+      if(a===0){ cells.forEach(c=>c.style.opacity='0.35'); }
+      else { cells.forEach(c=>c.style.opacity='1'); }
+    }
+  };
+
+  // =========================
+  // Speed Trainer
+  // =========================
+  const SpeedTrainer = {
+    onBeat(){
+      if(!st.enabled) return;
+      if(st.mode==='bars'){
+        // Count last subdivision's "first beat" only
+        // We are called only on strong beats from scheduler
+        st._barsLeft--;
+        if(st._barsLeft<=0) this.step();
+      }
+    },
+    start(){
+      st.enabled = true;
+      st.current = bpm;
+      st.targetUp = st.end >= st.start;
+      // Normalize
+      setBPM(st.start);
+      if(st.mode==='time'){
+        if(st._timer) clearInterval(st._timer);
+        st._timer = setInterval(()=>this.step(), Math.max(250, st.every*1000));
+      } else {
+        st._barsLeft = Math.max(1, Math.floor(st.every));
+      }
+      el('stEnable').classList.add('active');
+      el('stEnable').textContent = 'On';
+    },
+    stop(){
+      st.enabled = false;
+      if(st._timer) clearInterval(st._timer);
+      st._timer = null;
+      el('stEnable').classList.remove('active');
+      el('stEnable').textContent = 'Off';
+    },
+    step(){
+      if(!st.enabled) return;
+      const next = st.targetUp ? bpm + Math.abs(st.step) : bpm - Math.abs(st.step);
+      // Clamp to range and stop at end
+      if((st.targetUp && next>st.end) || (!st.targetUp && next<st.end)){
+        setBPM(st.end);
+        this.stop();
+        return;
+      }
+      setBPM(next);
+      if(st.mode==='bars'){ st._barsLeft = Math.max(1, Math.floor(st.every)); }
+    }
+  };
+
+  // =========================
+  // DOM Wiring & Controls
+  // =========================
+  function setBPM(v){
+    bpm = clamp(Math.round(v), 20, 300);
+    el('bpmDisplay').textContent = bpm;
+    el('knob').setAttribute('aria-valuenow', String(bpm));
+    updateNeedle();
+  }
+
+  function setBeats(n){
+    beatsPerBar = clamp(n, minBeats, maxBeats);
+    el('beatsPerBar').textContent = beatsPerBar;
+    el('timeSigTop').textContent = beatsPerBar;
+    // Rebuild accents, preserving existing where possible
+    const old = accents.slice();
+    accents = Array.from({length:beatsPerBar}, (_,i)=> old[i] ?? (i===0?3:1));
+    Visual.buildGrid();
+    Audio.updateSubdivision();
+  }
+
+  function updateNeedle(){
+    // Map BPM 20..300 → angle -130..+130
+    const ang = -130 + ( (bpm-20) / (300-20) ) * 260;
+    el('needle').style.transform = `rotate(${ang}deg)`;
+  }
+
+  function setNoteIndex(i){
+    noteIndex = clamp(i, 0, NOTE_STEPS.length-1);
+    el('noteLabel').textContent = NOTE_STEPS[noteIndex].name;
+    // Show denominator as "bottom" of time signature (visual only)
+    el('timeSigBottom').textContent = String(NOTE_STEPS[noteIndex].den);
+    Audio.updateSubdivision();
+  }
+
+  // Knob interactions
+  (function initKnob(){
+    const knob = el('knob');
+    let dragging = false, startY=0, startBPM=120;
+    const start = (e)=>{
+      dragging = true;
+      startY = (e.touches? e.touches[0].clientY : e.clientY);
+      startBPM = bpm;
+      e.preventDefault();
+    };
+    const move = (e)=>{
+      if(!dragging) return;
+      const y = (e.touches? e.touches[0].clientY : e.clientY);
+      const dy = startY - y;
+      setBPM(startBPM + Math.round(dy/2)); // 2px per BPM
+    };
+    const end = ()=> dragging=false;
+    knob.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    knob.addEventListener('touchstart', start, {passive:false});
+    window.addEventListener('touchmove', move, {passive:false});
+    window.addEventListener('touchend', end);
+
+    // Keyboard
+    knob.addEventListener('keydown', (e)=>{
+      if(e.key==='ArrowUp'){ setBPM(bpm + (e.shiftKey?5:1)); }
+      if(e.key==='ArrowDown'){ setBPM(bpm - (e.shiftKey?5:1)); }
+      if(e.key===' ' || e.key==='Enter'){ toggleStartStop(); e.preventDefault(); }
+    });
+
+    // Click center to toggle
+    knob.addEventListener('click', (e)=>{
+      // Ignore if dragging
+      if(!dragging) toggleStartStop();
+    });
+  })();
+
+  // Start/Stop
+  async function startAudio(){
+    await Audio.init();
+    Audio.start();
+    el('startBtn').disabled = true;
+    el('stopBtn').disabled = false;
+  }
+  function stopAudio(){
+    Audio.stop();
+    el('startBtn').disabled = false;
+    el('stopBtn').disabled = true;
+  }
+  function toggleStartStop(){ (el('stopBtn').disabled) ? startAudio() : stopAudio(); }
+
+  // Tap tempo
+  function handleTap(){
+    const now = performance.now();
+    const last = tapTimes.length ? tapTimes[tapTimes.length-1] : 0;
+    if(last && now - last > TAP_RESET_MS){ tapTimes = []; }
+    tapTimes.push(now);
+    const remain = Math.max(0, 4 - tapTimes.length);
+    if(tapTimes.length < 4){
+      el('tapStatus').textContent = remain>0 ? `Keep tapping (${remain} more)` : 'Keep tapping';
+    } else {
+      // Use last 3 intervals to compute BPM
+      const recent = tapTimes.slice(-4);
+      const intervals = [ recent[1]-recent[0], recent[2]-recent[1], recent[3]-recent[2] ];
+      const avgMs = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+      const newBPM = clamp(Math.round(60000/avgMs), 20, 300);
+      setBPM(newBPM);
+      el('tapStatus').textContent = `Detected: ${newBPM} BPM`;
+      // keep window small
+      tapTimes = tapTimes.slice(-4);
+    }
+    // auto clear after inactivity
+    if(handleTap._timer) clearTimeout(handleTap._timer);
+    handleTap._timer = setTimeout(()=>{ tapTimes=[]; el('tapStatus').textContent='Tap 4 times'; }, TAP_RESET_MS);
+  }
+
+  // Visual toggle
+  function toggleVisual(){
+    runVisual = !runVisual;
+    const b = el('visualToggle');
+    b.classList.toggle('active', runVisual);
+    b.textContent = runVisual ? 'Visual On' : 'Visual Off';
+    if(!runVisual){ el('dot').style.left = '2px'; }
+  }
+
+  // Wire buttons
+  el('startBtn').addEventListener('click', startAudio);
+  el('stopBtn').addEventListener('click', stopAudio);
+  el('tapBtn').addEventListener('click', handleTap);
+  el('tapClear').addEventListener('click', ()=>{ tapTimes=[]; el('tapStatus').textContent='Tap 4 times'; });
+  el('visualToggle').addEventListener('click', toggleVisual);
+
+  // Beats +/- (1..16)
+  el('beatMinus').addEventListener('click', ()=> setBeats(beatsPerBar-1));
+  el('beatPlus').addEventListener('click', ()=> setBeats(beatsPerBar+1));
+
+  // Subdivision shorter/longer
+  el('noteShorter').addEventListener('click', ()=> setNoteIndex(noteIndex+1));
+  el('noteLonger').addEventListener('click', ()=> setNoteIndex(noteIndex-1));
+
+  // Volume
+  el('volume').addEventListener('input', e=> Audio.setVolume(parseFloat(e.target.value)));
+
+  // Kit selection
+  el('kitSelect').addEventListener('change', e=>{
+    const v = e.target.value;
+    if(v==='auto'){ Audio.setKit('auto'); }
+    else { Audio.setKit(v); }
+  });
+
+  // Speed trainer wiring
+  function readST(){
+    st.start = clamp(parseInt(el('stStart').value||'100',10), 20, 300);
+    st.end   = clamp(parseInt(el('stEnd').value||'140',10),   20, 300);
+    st.step  = clamp(parseInt(el('stStep').value||'5',10),    1,  60);
+    st.mode  = el('stMode').value;
+    st.every = Math.max(1, parseInt(el('stEvery').value||'30',10));
+  }
+  ['stStart','stEnd','stStep','stMode','stEvery'].forEach(id=>{
+    el(id).addEventListener('change', readST);
+  });
+  el('stEnable').addEventListener('click', ()=>{
+    readST();
+    if(st.enabled) SpeedTrainer.stop();
+    else SpeedTrainer.start();
+  });
+
+  // Page visibility: keep audio accurate by continuing to schedule with WebAudio time
+  document.addEventListener('visibilitychange', ()=>{
+    if(!Audio.ctx) return;
+    if(document.visibilityState==='visible'){
+      // resync next note a tad ahead
+      Audio.nextNoteTime = Audio.ctx.currentTime + 0.05;
+    }
+  });
+
+  // Initial UI state
+  setBPM(bpm);
+  setBeats(beatsPerBar);
+  setNoteIndex(noteIndex);
+  Visual.buildGrid();
+
+  // Accessibility: spacebar on tap button also counts
+  el('tapBtn').addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); handleTap(); } });
+
+  // Informative console notes
+  console.log('%cMetronome ready','color:#6dd3ff');
+  console.log('Place samples at /audio/woodblock1/2/3.(wav|mp3|ogg). Falling back to synthesized ticks if missing.');
+})();
+</script>
+</body>
+</html>
