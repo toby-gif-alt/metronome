@@ -1,0 +1,38 @@
+{
+  "name": "Metronome — Tap • Train • Subdivide",
+  "short_name": "Metronome",
+  "description": "A professional metronome app with tap tempo, subdivision controls, and visual feedback",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f1222",
+  "background_color": "#0f1222",
+  "icons": [
+    {
+      "src": "metronome.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "metronome.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "metronome.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "metronome.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "utilities", "productivity"],
+  "lang": "en-US"
+}
